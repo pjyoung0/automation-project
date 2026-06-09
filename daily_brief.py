@@ -2,7 +2,7 @@ import os
 import feedparser
 import pandas as pd
 import yfinance as yf
-from pykrx import stock
+from pykrx import stock as krx
 from datetime import datetime, timedelta
 import google.generativeai as genai
 import smtplib
@@ -132,15 +132,17 @@ for name, ticker in stocks.items():
 
 try:
 
-    market_day = stock.get_nearest_business_day_in_a_week()
+    end_date = datetime.today()
 
-    kospi200 = stock.get_index_portfolio_deposit_file(
+    start_date = end_date - timedelta(days=7)
+
+    kospi200 = krx.get_index_portfolio_deposit_file(
         "1028"
     )
 
-    change_df = stock.get_market_price_change(
-        market_day,
-        market_day,
+    change_df = krx.get_market_price_change(
+        start_date.strftime("%Y%m%d"),
+        end_date.strftime("%Y%m%d"),
         market="KOSPI"
     )
 
@@ -150,19 +152,13 @@ try:
 
     top_up = (
         change_df
-        .sort_values(
-            "등락률",
-            ascending=False
-        )
+        .sort_values("등락률", ascending=False)
         .head(10)
     )
 
     top_down = (
         change_df
-        .sort_values(
-            "등락률",
-            ascending=True
-        )
+        .sort_values("등락률", ascending=True)
         .head(10)
     )
 
