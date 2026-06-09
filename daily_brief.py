@@ -2,6 +2,8 @@ import os
 import feedparser
 import pandas as pd
 import yfinance as yf
+from pykrx import stock
+from datetime import datetime, timedelta
 import google.generativeai as genai
 import smtplib
 
@@ -125,52 +127,208 @@ for name, ticker in stocks.items():
         print(name, e)
 
 # =========================
+# KOSPI200 전일 등락률 TOP10
+# =========================
+
+try:
+
+    market_day = stock.get_nearest_business_day_in_a_week()
+
+    kospi200 = stock.get_index_portfolio_deposit_file(
+        "1028"
+    )
+
+    change_df = stock.get_market_price_change(
+        market_day,
+        market_day,
+        market="KOSPI"
+    )
+
+    change_df = change_df.loc[
+        change_df.index.intersection(kospi200)
+    ]
+
+    top_up = (
+        change_df
+        .sort_values(
+            "등락률",
+            ascending=False
+        )
+        .head(10)
+    )
+
+    top_down = (
+        change_df
+        .sort_values(
+            "등락률",
+            ascending=True
+        )
+        .head(10)
+    )
+
+    market_text = ""
+
+    market_text += (
+        "[KOSPI200 상승률 TOP10]\n"
+    )
+
+    for _, row in top_up.iterrows():
+
+        market_text += (
+            f"- {row['종목명']} "
+            f"{row['등락률']:.2f}%\n"
+        )
+
+    market_text += "\n"
+
+    market_text += (
+        "[KOSPI200 하락률 TOP10]\n"
+    )
+
+    for _, row in top_down.iterrows():
+
+        market_text += (
+            f"- {row['종목명']} "
+            f"{row['등락률']:.2f}%\n"
+        )
+
+except Exception as e:
+
+    print(e)
+
+    market_text = ""
+
+# =========================
 # Gemini 분석
 # =========================
 
 prompt = f"""
-당신은 국내 주식형 펀드를 운용하는 펀드매니저입니다.
+당신은 국내 자산운용사 펀드매니저입니다.
 
-아래 뉴스와 주가 정보를 바탕으로 분석하세요.
+아래 뉴스, 주가 정보, 시장 데이터를 참고하여
+장 마감 브리핑을 작성하세요.
 
-각 종목별로:
-
-■ 핵심 뉴스
-- 내용
-
-■ 긍정 포인트
-- 내용
-
-■ 리스크
-- 내용
-
-■ 투자 시사점
-한 문단
-
-=================
-
-마지막에:
-
-■ 투자 시사점
-한 문단
-
-을 작성하세요.
-
-=================
-
-반드시 위 형식을 유지하세요.
-
-뉴스
+==================
+관심 종목 뉴스
+==================
 
 {news_text}
 
-=================
-
-주가 정보
+==================
+관심 종목 주가 정보
+==================
 
 {stock_info_text}
-"""
 
+==================
+시장 데이터
+==================
+
+{market_text}
+
+==================
+
+다음 형식으로 작성하세요.
+
+# 관심 종목 분석
+
+종목별로
+
+■ 핵심 뉴스
+
+■ 긍정 포인트
+
+■ 리스크
+
+■ 투자 시사점
+
+==================
+
+# 시장 분석
+
+■ 상승 종목 공통점
+
+3~5개
+
+■ 하락 종목 공통점
+
+3~5개
+
+■ 강세 섹터
+
+3개
+
+■ 약세 섹터
+
+3개
+
+==================
+
+# 내일 체크포인트
+
+■ 내일 주목할 섹터
+
+■ 내일 체크할 종목
+
+■ 내일 체크할 이벤트
+
+■ 펀드매니저 코멘트
+
+5~10줄
+
+실제 운용역이 작성하는
+장 마감 리포트처럼 작성하세요.
+
+마크다운 기호(**, ##)는 사용하지 말고
+읽기 쉬운 일반 텍스트 형식으로 작성하세요.
+
+아래 형식으로 작성할 것.
+
+━━━━━━━━━━━━━━━━━━
+
+[삼성전자]
+
+핵심 뉴스
+- ...
+
+긍정 포인트
+- ...
+
+리스크
+- ...
+
+투자 시사점
+- ...
+
+━━━━━━━━━━━━━━━━━━
+
+[시장 분석]
+
+상승 종목 공통점
+- ...
+
+하락 종목 공통점
+- ...
+
+━━━━━━━━━━━━━━━━━━
+
+[내일 체크포인트]
+
+주목할 섹터
+- ...
+
+주목할 종목
+- ...
+
+체크할 이벤트
+- ...
+
+펀드매니저 코멘트
+- ...
+
+━━━━━━━━━━━━━━━━━━
+
+"""
 response = model.generate_content(prompt)
 
 summary = response.text
@@ -219,21 +377,57 @@ EMAIL = os.environ["EMAIL_ADDRESS"]
 
 PASSWORD = os.environ["EMAIL_PASSWORD"]
 
+today_str = datetime.now().strftime(
+    "%Y-%m-%d"
+)
+
 msg = EmailMessage()
 
-msg["Subject"] = "Daily Stock Brief"
+msg["Subject"] = (
+    f"[장마감 브리핑] {today_str}"
+)
 
 msg["From"] = EMAIL
 
 msg["To"] = EMAIL
 
-msg.set_content(
-f"""
-[Daily Stock Brief]
+# Gemini 결과를 HTML로 변환
 
-{summary}
-"""
+html_summary = summary.replace(
+    "\n",
+    "<br>"
 )
+
+# HTML 메일 작성
+
+msg.add_alternative(
+    f"""
+    <html>
+    <body style="
+        font-family: Arial;
+        line-height: 1.6;
+        padding: 20px;
+    ">
+
+    <h2>📈 Daily Market Brief</h2>
+
+    {html_summary}
+
+    <br><br>
+
+    <hr>
+
+    <p>
+    자동 생성된 장마감 브리핑입니다.
+    </p>
+
+    </body>
+    </html>
+    """,
+    subtype="html"
+)
+
+# 엑셀 첨부
 
 with open(
     "daily_report.xlsx",
@@ -246,6 +440,8 @@ with open(
         subtype="octet-stream",
         filename="daily_report.xlsx"
     )
+
+# 메일 발송
 
 with smtplib.SMTP_SSL(
     "smtp.gmail.com",
