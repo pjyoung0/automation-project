@@ -16,5 +16,11 @@ jobs:
           pwd
           ls -la
 
+      - name: Install packages
+        run: |
+          pip install google-generativeai
+
       - name: Run Python
-        run: python ./daily_brief.py
+        run: python daily_brief.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
