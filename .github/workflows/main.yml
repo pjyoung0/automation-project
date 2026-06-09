@@ -1,28 +1,31 @@
-name: Test Workflow
+name: Daily Stock Brief
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+
+  run:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Show files
-        run: |
-          pwd
-          ls -la
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install packages
         run: |
-          pip install google-generativeai
+          pip install -r requirements.txt
 
-      - name: Run Python
-        run: python daily_brief.py
+      - name: Run script
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+
+        run: |
+          python daily_brief.py
