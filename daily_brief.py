@@ -1,11 +1,11 @@
-import os
-import feedparser
-import pandas as pd
-import yfinance as yf
-from pykrx import stock as krx
-from datetime import datetime, timedelta
-import google.generativeai as genai
-import smtplib
+### import os
+### import feedparser
+### import pandas as pd
+### import yfinance as yf
+### from pykrx import stock as krx
+### from datetime import datetime, timedelta
+### import google.generativeai as genai
+### import smtplib
 
 from email.message import EmailMessage
 
